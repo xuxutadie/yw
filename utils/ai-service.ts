@@ -1,8 +1,13 @@
 // AI服务 - 使用豆包API
 
-const DOUBAO_API_KEY = process.env.DOUBAO_API_KEY
-const DOUBAO_API_URL = process.env.DOUBAO_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions'
-const DOUBAO_ENDPOINT_ID = process.env.DOUBAO_ENDPOINT_ID
+// 获取环境变量（在运行时读取）
+function getDoubaoConfig() {
+  return {
+    apiKey: process.env.DOUBAO_API_KEY,
+    apiUrl: process.env.DOUBAO_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+    endpointId: process.env.DOUBAO_ENDPOINT_ID,
+  }
+}
 
 export interface Message {
   role: 'system' | 'user' | 'assistant'
@@ -59,15 +64,25 @@ export async function* chatWithAIStream(messages: Message[]): AsyncGenerator<str
 
 // 调用豆包API
 export async function chatWithDoubao(messages: Message[]): Promise<string> {
+  const config = getDoubaoConfig()
+  
+  if (!config.apiKey) {
+    throw new Error('DOUBAO_API_KEY 环境变量未配置')
+  }
+  
+  if (!config.endpointId) {
+    throw new Error('DOUBAO_ENDPOINT_ID 环境变量未配置')
+  }
+  
   try {
-    const response = await fetch(DOUBAO_API_URL, {
+    const response = await fetch(config.apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DOUBAO_API_KEY}`,
+        'Authorization': `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify({
-        model: DOUBAO_ENDPOINT_ID,
+        model: config.endpointId,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           ...messages,
@@ -98,15 +113,25 @@ export async function chatWithDoubao(messages: Message[]): Promise<string> {
 
 // 流式调用豆包API
 export async function* chatWithDoubaoStream(messages: Message[]): AsyncGenerator<string, void, unknown> {
+  const config = getDoubaoConfig()
+  
+  if (!config.apiKey) {
+    throw new Error('DOUBAO_API_KEY 环境变量未配置')
+  }
+  
+  if (!config.endpointId) {
+    throw new Error('DOUBAO_ENDPOINT_ID 环境变量未配置')
+  }
+  
   try {
-    const response = await fetch(DOUBAO_API_URL, {
+    const response = await fetch(config.apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DOUBAO_API_KEY}`,
+        'Authorization': `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify({
-        model: DOUBAO_ENDPOINT_ID,
+        model: config.endpointId,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           ...messages,
