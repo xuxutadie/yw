@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Sparkles, BookOpen, PenTool, FileText, Lightbulb, X, Minimize2, Copy, Check, RotateCcw, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Send, Bot, User, Sparkles, BookOpen, PenTool, FileText, Lightbulb, X, Minimize2, Copy, Check, RotateCcw, ThumbsUp, ThumbsDown, FastForward } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -12,6 +12,100 @@ interface Message {
   content: string
   timestamp: Date
   isStreaming?: boolean
+}
+
+// 打字机效果组件
+function TypewriterMessage({ 
+  content, 
+  isNew,
+  onComplete,
+  messageId,
+  onSkip
+}: { 
+  content: string
+  isNew: boolean
+  onComplete?: () => void
+  messageId: string
+  onSkip?: (id: string) => void
+}) {
+  const [displayedText, setDisplayedText] = useState(isNew ? '' : content)
+  const [isTyping, setIsTyping] = useState(isNew)
+  const contentRef = useRef(content)
+  const isNewRef = useRef(isNew)
+
+  useEffect(() => {
+    contentRef.current = content
+  }, [content])
+
+  useEffect(() => {
+    if (!isNewRef.current) {
+      setDisplayedText(content)
+      return
+    }
+
+    let currentIndex = 0
+    const text = contentRef.current
+    
+    const typeNextChar = () => {
+      if (currentIndex < text.length) {
+        setDisplayedText(text.slice(0, currentIndex + 1))
+        currentIndex++
+        
+        // 根据字符类型调整速度
+        const char = text[currentIndex - 1]
+        let delay = 25 // 基础速度（毫秒）
+        
+        // 标点符号稍微停顿久一点
+        if (/[。！？.!?]/.test(char)) {
+          delay = 120
+        } else if (/[，、,;；]/.test(char)) {
+          delay = 60
+        } else if (char === '\n') {
+          delay = 80
+        }
+
+        setTimeout(typeNextChar, delay)
+      } else {
+        setIsTyping(false)
+        onComplete?.()
+      }
+    }
+
+    typeNextChar()
+  }, [content, onComplete])
+
+  const handleSkip = () => {
+    setDisplayedText(content)
+    setIsTyping(false)
+    onSkip?.(messageId)
+    onComplete?.()
+  }
+
+  return (
+    <div className="relative">
+      <div className="prose prose-sm max-w-none prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeHighlight]}
+        >
+          {displayedText}
+        </ReactMarkdown>
+      </div>
+      {isTyping && (
+        <div className="flex items-center gap-2 mt-2">
+          <span className="inline-block w-2 h-4 bg-primary-500 animate-pulse"></span>
+          <button
+            onClick={handleSkip}
+            className="flex items-center gap-1 px-2 py-0.5 text-xs text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
+            title="跳过动画"
+          >
+            <FastForward className="w-3 h-3" />
+            跳过
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // 快捷场景
@@ -36,8 +130,22 @@ export default function AIFloatingButton() {
   const [isLoading, setIsLoading] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [typingMessageId, setTypingMessageId] = useState<string | null>(null)
+  const [completedMessages, setCompletedMessages] = useState<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // 处理打字完成
+  const handleTypeComplete = useCallback((messageId: string) => {
+    setCompletedMessages(prev => new Set(prev).add(messageId))
+    setTypingMessageId(null)
+  }, [])
+
+  // 处理跳过打字
+  const handleSkipTyping = useCallback((messageId: string) => {
+    setCompletedMessages(prev => new Set(prev).add(messageId))
+    setTypingMessageId(null)
+  }, [])
 
   // 自动滚动到底部
   useEffect(() => {
@@ -109,7 +217,7 @@ export default function AIFloatingButton() {
 
       const data = await response.json()
 
-      // 更新AI消息
+      // 更新AI消息并启用打字机效果
       setMessages((prev) =>
         prev.map((m) =>
           m.id === aiMessageId
@@ -117,11 +225,13 @@ export default function AIFloatingButton() {
             : m
         )
       )
+      // 设置当前打字的消息ID
+      setTypingMessageId(aiMessageId)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '未知错误'
       setError(errorMessage)
       
-      // 更新AI消息为错误提示
+      // 更新AI消息为错误提示（错误消息不打字机效果）
       setMessages((prev) =>
         prev.map((m) =>
           m.id === aiMessageId
@@ -133,6 +243,7 @@ export default function AIFloatingButton() {
             : m
         )
       )
+      setCompletedMessages(prev => new Set(prev).add(aiMessageId))
     } finally {
       setIsLoading(false)
       abortControllerRef.current = null
@@ -221,6 +332,8 @@ export default function AIFloatingButton() {
             : m
         )
       )
+      // 设置当前打字的消息ID
+      setTypingMessageId(aiMessageId)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '未知错误'
       setError(errorMessage)
@@ -236,6 +349,7 @@ export default function AIFloatingButton() {
             : m
         )
       )
+      setCompletedMessages(prev => new Set(prev).add(aiMessageId))
     } finally {
       setIsLoading(false)
       abortControllerRef.current = null
@@ -357,49 +471,62 @@ export default function AIFloatingButton() {
                   }`}
                 >
                   {message.role === 'assistant' ? (
-                    <div className="prose prose-sm max-w-none prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeHighlight]}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
-                      {message.isStreaming && (
-                        <span className="inline-block w-2 h-4 bg-primary-500 animate-pulse ml-1"></span>
+                    <>
+                      {/* 使用打字机效果显示AI回复 */}
+                      {message.id === typingMessageId && !completedMessages.has(message.id) ? (
+                        <TypewriterMessage
+                          content={message.content}
+                          isNew={true}
+                          messageId={message.id}
+                          onComplete={() => handleTypeComplete(message.id)}
+                          onSkip={handleSkipTyping}
+                        />
+                      ) : (
+                        <div className="prose prose-sm max-w-none prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight]}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                          {message.isStreaming && (
+                            <span className="inline-block w-2 h-4 bg-primary-500 animate-pulse ml-1"></span>
+                          )}
+                        </div>
                       )}
-                    </div>
+
+                      {/* 操作按钮 - 打字完成后显示 */}
+                      {message.id !== typingMessageId && !message.isStreaming && message.id !== 'welcome' && (
+                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200/50">
+                          <button
+                            onClick={() => copyMessage(message.content, message.id)}
+                            className="p-1 hover:bg-gray-200 rounded transition-colors"
+                            title="复制"
+                          >
+                            {copiedId === message.id ? (
+                              <Check className="w-3.5 h-3.5 text-green-500" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5 text-gray-400" />
+                            )}
+                          </button>
+                          <button
+                            onClick={regenerateResponse}
+                            className="p-1 hover:bg-gray-200 rounded transition-colors"
+                            title="重新生成"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5 text-gray-400" />
+                          </button>
+                          <button className="p-1 hover:bg-gray-200 rounded transition-colors">
+                            <ThumbsUp className="w-3.5 h-3.5 text-gray-400" />
+                          </button>
+                          <button className="p-1 hover:bg-gray-200 rounded transition-colors">
+                            <ThumbsDown className="w-3.5 h-3.5 text-gray-400" />
+                          </button>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  )}
-
-                  {/* 操作按钮 */}
-                  {message.role === 'assistant' && !message.isStreaming && message.id !== 'welcome' && (
-                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200/50">
-                      <button
-                        onClick={() => copyMessage(message.content, message.id)}
-                        className="p-1 hover:bg-gray-200 rounded transition-colors"
-                        title="复制"
-                      >
-                        {copiedId === message.id ? (
-                          <Check className="w-3.5 h-3.5 text-green-500" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5 text-gray-400" />
-                        )}
-                      </button>
-                      <button
-                        onClick={regenerateResponse}
-                        className="p-1 hover:bg-gray-200 rounded transition-colors"
-                        title="重新生成"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5 text-gray-400" />
-                      </button>
-                      <button className="p-1 hover:bg-gray-200 rounded transition-colors">
-                        <ThumbsUp className="w-3.5 h-3.5 text-gray-400" />
-                      </button>
-                      <button className="p-1 hover:bg-gray-200 rounded transition-colors">
-                        <ThumbsDown className="w-3.5 h-3.5 text-gray-400" />
-                      </button>
-                    </div>
                   )}
                 </div>
               </div>
