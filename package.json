@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "小学语文教师专属教学辅助工具 - 备课、教学、批改、教研一体化平台",
   "main": "index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
