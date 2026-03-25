@@ -1,0 +1,52 @@
+{
+  "name": "chinese-teacher-assistant",
+  "version": "1.0.0",
+  "description": "小学语文教师专属教学辅助工具 - 备课、教学、批改、教研一体化平台",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "教育",
+    "语文教学",
+    "教师工具",
+    "备课",
+    "批改"
+  ],
+  "author": "教育科技团队",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/uuid": "^9.0.0",
+    "autoprefixer": "^10.4.0",
+    "axios": "^1.6.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "date-fns": "^2.30.0",
+    "lucide-react": "^0.294.0",
+    "next": "^14.0.0",
+    "pdf-parse": "^2.4.5",
+    "postcss": "^8.4.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^9.0.0",
+    "react-query": "^3.39.0",
+    "rehype-highlight": "^7.0.0",
+    "remark-gfm": "^4.0.0",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5.0.0",
+    "uuid": "^9.0.0",
+    "zustand": "^4.4.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.0.0"
+  }
+}

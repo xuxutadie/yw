@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <!-- 木质渐变 -->
+    <linearGradient id="woodGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D4A574;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#C4956A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8865C;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- 高光渐变 -->
+    <radialGradient id="highlightGradient" cx="30%" cy="30%" r="50%">
+      <stop offset="0%" style="stop-color:#E8D4C4;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#E8D4C4;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- 木鱼主体 -->
+  <path d="M 30 130
+           C 20 90 50 40 100 35
+           C 150 40 180 90 170 130
+           C 160 160 100 170 60 160
+           C 40 155 30 140 30 130 Z"
+        fill="url(#woodGradient)" stroke="#A67B5B" stroke-width="2"/>
+  
+  <!-- 木鱼开口 -->
+  <path d="M 50 105
+           Q 100 130 150 100
+           L 145 90
+           Q 100 115 55 95
+           Z"
+        fill="#4A3728"/>
+  
+  <!-- 开口阴影 -->
+  <path d="M 55 100
+           Q 100 125 145 95
+           Q 100 120 60 100
+           Z"
+        fill="#6B5344" opacity="0.5"/>
+  
+  <!-- 顶部高光 -->
+  <ellipse cx="85" cy="65" rx="25" ry="15" fill="url(#highlightGradient)"/>
+  
+  <!-- 侧面高光 -->
+  <ellipse cx="120" cy="90" rx="15" ry="20" fill="url(#highlightGradient)" opacity="0.4"/>
+  
+  <!-- 底部阴影 -->
+  <ellipse cx="100" cy="165" rx="50" ry="8" fill="#000000" opacity="0.2"/>
+</svg>
