@@ -37,8 +37,71 @@ export default function EssayPage() {
     setWordCount(text.replace(/\s/g, '').length)
   }
 
-  // 处理图片上传
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImageForOCR = (file: File, maxSizeMB: number = 8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            reject(new Error('图片处理失败'))
+            return
+          }
+
+          let width = img.width
+          let height = img.height
+          const maxDimension = 2200
+          if (width > maxDimension || height > maxDimension) {
+            const scale = Math.min(maxDimension / width, maxDimension / height)
+            width = Math.floor(width * scale)
+            height = Math.floor(height * scale)
+          }
+
+          const maxBytes = maxSizeMB * 1024 * 1024
+          let quality = 0.9
+          let scaleDown = 1
+
+          const encode = () => {
+            canvas.width = Math.max(1, Math.floor(width * scaleDown))
+            canvas.height = Math.max(1, Math.floor(height * scaleDown))
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+            return canvas.toDataURL('image/jpeg', quality)
+          }
+
+          let dataUrl = encode()
+          let sizeBytes = (dataUrl.split(',')[1].length * 3) / 4
+
+          while (sizeBytes > maxBytes && quality > 0.35) {
+            quality -= 0.08
+            dataUrl = encode()
+            sizeBytes = (dataUrl.split(',')[1].length * 3) / 4
+          }
+
+          while (sizeBytes > maxBytes && scaleDown > 0.45) {
+            scaleDown -= 0.08
+            quality = Math.min(0.9, quality + 0.1)
+            dataUrl = encode()
+            sizeBytes = (dataUrl.split(',')[1].length * 3) / 4
+          }
+
+          if (sizeBytes > maxBytes) {
+            reject(new Error('图片过大，请上传更小的图片'))
+            return
+          }
+
+          resolve(dataUrl)
+        }
+        img.onerror = () => reject(new Error('图片读取失败'))
+        img.src = event.target?.result as string
+      }
+      reader.onerror = () => reject(new Error('文件读取失败'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -47,43 +110,84 @@ export default function EssayPage() {
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const imageUrl = event.target?.result as string
+    // 重置前面的状态，确保页面刷新
+    setContent('')
+    setTitle('正在识别...')
+    setAssessment(null)
+    setStatus('analyzing')
+
+    try {
+      const imageUrl = await compressImageForOCR(file)
       setUploadedImage(imageUrl)
-      // 模拟OCR识别（实际项目中应调用OCR API）
-      simulateOCR(imageUrl)
+      await performOCR(imageUrl)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '图片处理失败，请重试')
+      setStatus('draft')
+      setTitle('')
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
-    reader.readAsDataURL(file)
   }
 
-  // 模拟OCR识别
-  const simulateOCR = (imageUrl: string) => {
+  // 真实的 OCR 识别
+  const performOCR = async (imageUrl: string) => {
     setStatus('analyzing')
-    
-    // 模拟OCR处理时间
-    setTimeout(() => {
-      // 这里模拟识别出的文本
-      // 实际项目中应该调用OCR API，如百度OCR、腾讯OCR等
-      const mockRecognizedText = `今天是个晴朗的日子，我和爸爸妈妈一起去公园玩。
+    try {
+      console.log('开始请求 OCR API...');
+      const response = await fetch('/api/essay/ocr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageUrl }),
+      })
 
-公园里有很多花草树木，五颜六色的花儿竞相开放，美丽极了。小鸟在树上欢快地歌唱，蝴蝶在花丛中翩翩起舞。
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `OCR识别失败: ${response.status}`)
+      }
 
-我们在草地上野餐，吃着美味的食物，聊着开心的话题。下午，我还和小伙伴们一起放风筝，看着风筝越飞越高，我的心情也格外愉快。
+      const data = await response.json()
+      console.log('OCR 识别结果:', data);
+      
+      const recognizedText = data.text || '未能识别出文字，请重试';
 
-这真是一个难忘的周末啊！`
+      // 强制使用最新的提取文本覆盖所有状态
+      setContent(recognizedText)
+      setWordCount(recognizedText.replace(/\s/g, '').length)
+      setTitle('图片识别结果')
       
-      setContent(mockRecognizedText)
-      setWordCount(mockRecognizedText.replace(/\s/g, '').length)
-      setTitle('快乐的周末')
+      // 直接触发批改，不再依赖延迟，使用闭包内最新的 recognizedText
+      try {
+        const gradeResponse = await fetch('/api/essay/grade', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ title: '图片识别结果', content: recognizedText }),
+        })
+
+        if (!gradeResponse.ok) {
+          throw new Error('批改服务暂时不可用')
+        }
+
+        const gradeData = await gradeResponse.json()
+        setAssessment(gradeData.assessment)
+        setStatus('completed')
+        alert('图片识别完成！已自动进行AI批改评分。')
+      } catch (gradeError) {
+        console.error('自动批改失败:', gradeError)
+        setStatus('draft')
+        alert('图片文字识别成功，但自动批改失败，请手动点击“AI批改”按钮。')
+      }
       
-      // 自动进行评分
-      const result = analyzeEssay('快乐的周末', mockRecognizedText)
-      setAssessment(result)
-      setStatus('completed')
-      
-      alert('图片识别完成！已自动评分')
-    }, 2500)
+    } catch (error) {
+      console.error('OCR 识别过程发生错误:', error)
+      alert(error instanceof Error ? error.message : '图片识别失败，请检查网络或重试。')
+      setStatus('draft')
+    }
   }
 
   // 触发文件选择
